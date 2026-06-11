@@ -1,0 +1,648 @@
+{
+  "name": "My workflow 2",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        496,
+        1136
+      ],
+      "id": "f6c8680f-6551-4549-af85-b379065ae8e3",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "url": "https://api.semanticscholar.org/graph/v1/paper/search",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "query",
+              "value": "deep learning medical image classification"
+            },
+            {
+              "name": "limit",
+              "value": "20"
+            },
+            {
+              "name": "fields",
+              "value": "title,abstract,year,citationCount"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "s2k-NUwgbpqK6Nm3fX4fzsLywZR6ibC8Yn9BmDChK49A"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        736,
+        -176
+      ],
+      "id": "745bde12-8a79-404d-9785-af55eb7f0c8f",
+      "name": " Search Papers (HTTP Request)"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "data",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        976,
+        -160
+      ],
+      "id": "c2e8bd6f-9d16-43f6-8472-5dbaac96476e",
+      "name": "Split Out"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        880,
+        1136
+      ],
+      "id": "9f965f8a-591c-48aa-92c0-6df5ca57bb45",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are a systematic review screener.\n\nYour task is to screen research papers based on inclusion criteria.\n\nCRITERIA:\n\n* C1: Uses deep learning or machine learning\n* C2: Involves medical images\n* C3: About classification or diagnosis\n* C4: Presents a method (not a survey/review/editorial)\n\nTitle: {{ $json.title }}\n\nAbstract: {{ $json.abstract }}\n\nIMPORTANT RULES:\n\n* Return ONLY raw valid JSON\n* Do NOT use markdown\n* Do NOT use ```json\n* Do NOT explain anything outside JSON\n* confidence must be a number between 0 and 1\n* criteria_matched must be an array\n\nReturn EXACTLY in this format:\n\n{\n\"decision\": \"Include\",\n\"confidence\": 0.85,\n\"reason\": \"Short one sentence explanation.\",\n\"criteria_matched\": [\"C1\", \"C2\", \"C3\"]\n}\n",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1216,
+        1152
+      ],
+      "id": "450e844d-c8b1-48e2-ad1c-be29f6752fd7",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "7e17637a-b99f-44a3-8bca-5d8393694501",
+              "leftValue": "={{ JSON.parse($json.output).confidence }}",
+              "rightValue": 1,
+              "operator": {
+                "type": "number",
+                "operation": "lt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1488,
+        1152
+      ],
+      "id": "b591cdc2-88d4-4bb6-a769-839356f7358a",
+      "name": "Confidence Check"
+    },
+    {
+      "parameters": {
+        "operation": "sendAndWait",
+        "fromEmail": "u2104067@student.cuet.ac.bd",
+        "toEmail": "iamawarethatiamrare320@gmail.com",
+        "subject": "[Review Required] Low Confidence Screening Check",
+        "message": "=A paper needs your manual review.\n\nTitle: {{ $('Loop Over Items').item.json.title }}\n\nAbstract: {{ $('Loop Over Items').item.json.abstract }}\n\nAI Decision: {{ JSON.parse($json.output).decision }}\n\nAI Reason: {{ JSON.parse($json.output).reason }}\n\nAI Confidence: {{ JSON.parse($json.output).confidence }}",
+        "approvalOptions": {
+          "values": {
+            "approvalType": "double",
+            "approveLabel": "Include",
+            "disapproveLabel": "Exclude"
+          }
+        },
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1680,
+        1008
+      ],
+      "id": "40683198-0db2-4144-8e26-2680cbc771f5",
+      "name": "Send message and wait for response",
+      "webhookId": "5662a21e-4f9d-43a8-b430-d84303a20dbe"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d190f540-6318-4a99-9811-deae032514dc",
+              "name": "reviewed_by",
+              "value": "AI",
+              "type": "string"
+            },
+            {
+              "id": "0617c8aa-d7fb-46c1-9e31-cf700f5640e0",
+              "name": "predicted_decision",
+              "value": "={{ JSON.parse($json.output).decision }}",
+              "type": "string"
+            },
+            {
+              "id": "7cb7157f-8f88-4e9a-a10a-1ed1805923ef",
+              "name": "predicted_reason",
+              "value": "={{ JSON.parse($json.output).reason }}",
+              "type": "string"
+            },
+            {
+              "id": "a9ee2b07-045f-4d81-b3e5-b64cd74e76b6",
+              "name": "predicted_confidence",
+              "value": "={{ JSON.parse($json.output).confidence }}",
+              "type": "string"
+            },
+            {
+              "id": "41a1be7e-f268-40fd-9874-c9b5abe21ffa",
+              "name": "ai_proposed_decision",
+              "value": "={{ JSON.parse($('AI Agent').item.json.output.replace(/```json/gi, '').replace(/```/g, '').trim()).decision }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1680,
+        1232
+      ],
+      "id": "2bd9866b-4462-4afa-8c21-ee3204aec700",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "6eea2b4a-8381-4e8a-9106-8b97ddbeeb5e",
+              "name": "reviewed_by",
+              "value": "Human",
+              "type": "string"
+            },
+            {
+              "id": "0b2826df-0641-4283-9695-ed97cecba528",
+              "name": "predicted_decision",
+              "value": "={{ $json.data.approved ? \"Include\" : \"Exclude\" }}",
+              "type": "string"
+            },
+            {
+              "id": "b3bb5c56-6cf1-4fb4-b61a-2cc7fb082397",
+              "name": "predicted_reason",
+              "value": "Manually reviewed due to low confidence",
+              "type": "string"
+            },
+            {
+              "id": "f8b39538-afdc-44f1-8d3d-ecdea476988d",
+              "name": "ai_proposed_decision",
+              "value": "={{ JSON.parse($item(0).$node[\"AI Agent\"].json[\"output\"]).decision }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1856,
+        1008
+      ],
+      "id": "724b71b7-5c52-412a-829a-f98690450478",
+      "name": "Edit Fields1"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1856,
+        1248
+      ],
+      "id": "46f08bfe-552a-4882-9556-c88e3a9a817c",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1urZZhnxQBDPO8p4FsB1LwSGdkg3HJnmgy-fjfRxg1So",
+          "mode": "list",
+          "cachedResultName": "paper_dataset",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1urZZhnxQBDPO8p4FsB1LwSGdkg3HJnmgy-fjfRxg1So/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 946244558,
+          "mode": "list",
+          "cachedResultName": "papers_to_label_v2",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1urZZhnxQBDPO8p4FsB1LwSGdkg3HJnmgy-fjfRxg1So/edit#gid=946244558"
+        },
+        "filtersUI": {
+          "values": []
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        688,
+        1136
+      ],
+      "id": "e0e9ba9b-2d1d-44ed-a745-02c9081a9ee2",
+      "name": "Get row(s) in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "FjACKf1Thax9ujQa",
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1D6ydBsUblrxXuQvhMWtNuIAItvEQu8qpjLhbGSumTr4",
+          "mode": "list",
+          "cachedResultName": "Experiment_results_0.000000",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1D6ydBsUblrxXuQvhMWtNuIAItvEQu8qpjLhbGSumTr4/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1VO9rUThWqbZhDpX6Ax68V8z4OdX_kRmm_Hx4A5BzQOk/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "hw": "={{ $('Loop Over Items').item.json.hw }}",
+            "title": "={{ $('Loop Over Items').item.json.title }}",
+            "abstract": "={{ $('Loop Over Items').item.json.abstract }}",
+            "year": "={{ $('Loop Over Items').item.json.year }}",
+            "citation_count": "={{ $('Loop Over Items').item.json.citation_count }}",
+            "decision": "={{ $('Loop Over Items').item.json.decision }}",
+            "reason": "={{ $('Loop Over Items').item.json.reason }}",
+            "predicted_decision": "={{ $json.predicted_decision }}",
+            "predicted_reason": "={{ $json.predicted_reason }}",
+            "predicted_confidence": "={{ $json.predicted_confidence }}",
+            "reviewed_by": "={{ $json.reviewed_by }}",
+            "ai_proposed_decision": "={{ $json.ai_proposed_decision }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "hw",
+              "displayName": "hw",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "title",
+              "displayName": "title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "abstract",
+              "displayName": "abstract",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "year",
+              "displayName": "year",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "citation_count",
+              "displayName": "citation_count",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "decision",
+              "displayName": "decision",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "reason",
+              "displayName": "reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "predicted_decision",
+              "displayName": "predicted_decision",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "predicted_reason",
+              "displayName": "predicted_reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "predicted_confidence",
+              "displayName": "predicted_confidence",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "reviewed_by",
+              "displayName": "reviewed_by",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "ai_proposed_decision",
+              "displayName": "ai_proposed_decision",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2000,
+        1248
+      ],
+      "id": "9b67b08b-56b8-4824-9aa1-b1199583b01f",
+      "name": "Append row in sheet"
+    },
+    {
+      "parameters": {
+        "amount": 2
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1072,
+        1152
+      ],
+      "id": "c0ff7a24-3247-481b-be19-8f7cfe40aa91",
+      "name": "Wait",
+      "webhookId": "0630cdc7-c4b5-4bfb-9502-e59d257e98ff"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-5-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        1216,
+        1440
+      ],
+      "id": "7f78bc2b-70c2-4844-ab52-28a884fa2e34",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "8zFB9yXtJMXrSlBw",
+          "name": "n8n free OpenAI API credits"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Get row(s) in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Confidence Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Confidence Check": {
+      "main": [
+        [
+          {
+            "node": "Send message and wait for response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send message and wait for response": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields1": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s) in sheet": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append row in sheet": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "75a33194-c8a4-4d5d-91a6-dade6d243698",
+  "meta": {
+    "instanceId": "c975df036704279d6a7235bbea6c0c4dcc62a0324aeab32e40a684f1c3865acc"
+  },
+  "id": "stBGJh7M735vigoO",
+  "tags": []
+}
